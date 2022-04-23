@@ -10,6 +10,9 @@ logs/*
 
 *.csv
 
+gec/benchmarks
+gec/data
+
 ### Python template
 # Byte-compiled / optimized / DLL files
 __pycache__/

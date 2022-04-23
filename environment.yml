@@ -25,7 +25,9 @@ dependencies:
   - editdistance
 
   # Development
-  - wandb
+  - jupyter
+  - ipykernel=6.2.0  # https://youtrack.jetbrains.com/issue/PY-43337
+#  - wandb
 
 #  # If you need to install pip packages, don't do `pip install xxx`
 #  # Add the package here and run `mamba env update -f environment.yml --prune`

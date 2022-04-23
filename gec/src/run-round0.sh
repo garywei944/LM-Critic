@@ -12,7 +12,7 @@ mkdir -p $outdir
 python3.8 -u src/run_seq2seq.py \
     --model_name_or_path facebook/bart-base --task summarization --text_column bad_detoked --summary_column good_detoked \
     --do_train --num_train_epochs 1 --train_file data/round0__synthetic/synthetic_paired_data_9M.json \
-    --preprocessing_num_workers 20 --overwrite_output_dir --output_dir $outdir --predict_with_generate --fp16 \
+    --preprocessing_num_workers 32 --overwrite_output_dir --output_dir $outdir --predict_with_generate --fp16 \
     --per_device_train_batch_size 64 --gradient_accumulation_steps 8 --max_source_length 64 --max_target_length 64 \
     --logging_first_step --logging_steps 20 --save_steps 2000 \
   |& tee $outdir/log.txt
