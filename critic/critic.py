@@ -59,7 +59,7 @@ def gpt2_critic_char_level_only(sent, verbose=1, cuda=True, fp16=True,
                                 seed='auto', n_samples=100):
     if seed == 'auto':
         seed = int(hashlib.md5(sent.encode()).hexdigest(), 16) % (
-                    2 ** 32)  # Seed must be between 0 and 2**32 - 1
+                2 ** 32)  # Seed must be between 0 and 2**32 - 1
     if verbose > 1:
         print('seed', seed)
     np.random.seed(seed);
@@ -99,11 +99,13 @@ def gpt2_critic_char_level_only(sent, verbose=1, cuda=True, fp16=True,
     return is_good, float(logps[0]), counter_example
 
 
-def gpt2_critic(sent, verbose=1, cuda=True, fp16=True, seed='auto',
-                n_samples=100, word_level_mode='refine'):
+def gpt2_critic(
+        sent, verbose=1, cuda=True, fp16=True, seed='auto',
+        n_samples=100, word_level_mode='refine'
+):
     if seed == 'auto':
         seed = int(hashlib.md5(sent.encode()).hexdigest(), 16) % (
-                    2 ** 32)  # Seed must be between 0 and 2**32 - 1
+                2 ** 32)  # Seed must be between 0 and 2**32 - 1
     if verbose > 1:
         print('seed', seed)
     np.random.seed(seed);
