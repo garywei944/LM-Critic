@@ -4,7 +4,7 @@ import random
 import hashlib
 import numpy as np
 from tqdm import tqdm
-from transformers import GPT2Tokenizer, GPT2Model, GPT2LMHeadModel
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
 # sys.path.insert(0, '.')
 from critic.perturbations import (
@@ -19,12 +19,19 @@ def init_model(
         model_name: str,
         cuda: bool = True
 ):
-    if model_name == 'gpt2':
-        tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    if model_name in ['gtp2']:
+        model = AutoModelForCausalLM.from_pretrained(model_name)
         tokenizer.pad_token = tokenizer.eos_token
-        model = GPT2LMHeadModel.from_pretrained(model_name)
+    elif 'bert' in model_name.lower():
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            is_decoder=True
+        )
+        tokenizer.bos_token = tokenizer.pad_token
     else:
-        raise ValueError(f"Doesn't support model {model_name}")
+        model = AutoModelForCausalLM.from_pretrained(model_name)
 
     model.eval()
 
