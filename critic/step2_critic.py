@@ -18,44 +18,28 @@ MAX_LENGTH = 66
 
 
 def init_model(
-        model_name: str,
+        model_name='bert-base-uncased',
         cuda: bool = True
 ):
-    if model_name in ['gpt2', 'EleutherAI/gpt-neo-1.3B']:
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForCausalLM.from_pretrained(model_name)
-        tokenizer.pad_token = tokenizer.eos_token
-    elif 'roberta' in model_name.lower():
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = RobertaForCausalLM.from_pretrained(
-            model_name,
-            is_decoder=True
-        )
-    elif 'bert' in model_name.lower():
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = BertLMHeadModel.from_pretrained(
-            model_name,
-            is_decoder=True
-        )
-        tokenizer.bos_token = tokenizer.pad_token
-    elif 'bart' in model_name.lower():
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = BartForConditionalGeneration.from_pretrained(model_name)
-    elif 'gpt-j' in model_name.lower():
-        tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-j-6B")
-        model = AutoModelForCausalLM.from_pretrained("EleutherAI/gpt-j-6B")
-    else:
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForCausalLM.from_pretrained(model_name)
+    # gpt2
+    gpt2_tokenizer = AutoTokenizer.from_pretrained('gpt2')
+    gpt2_model = AutoModelForCausalLM.from_pretrained('gpt2')
+    gpt2_tokenizer.pad_token = gpt2_tokenizer.eos_token
+    gpt2_model.eval()
 
-    model.eval()
+    # bert
+    bert_tokenizer = AutoTokenizer.from_pretrained(model_name)
+    bert_model = AutoModelForMaskedLM.from_pretrained(model_name)
+    bert_tokenizer.bos_token = bert_tokenizer.pad_token
+    bert_model.eval()
 
     if cuda:
-        model.cuda()
+        gpt2_model.cuda()
+        bert_model.cuda()
 
-    print(f'Loaded {model_name}')
+    print(f'Loaded gpt2 and {model_name}')
 
-    return model, tokenizer
+    return gpt2_model, gpt2_tokenizer, bert_model, bert_tokenizer
 
 
 def compute_loss(
@@ -77,8 +61,10 @@ def compute_loss(
             shift_mask = attention_mask[..., 1:].contiguous()
             loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
             bsize, seqlen = input_ids.size()
-            loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)),
-                            shift_labels.view(-1)).view(bsize, seqlen - 1)
+            loss = loss_fct(
+                shift_logits.view(-1, shift_logits.size(-1)),
+                shift_labels.view(-1)
+            ).view(bsize, seqlen - 1)
             loss = (loss * shift_mask).sum(dim=1)  # [bsize, ]
         return loss
 
@@ -106,12 +92,83 @@ def run_model(
     return logps
 
 
+def compute_bert_loss(
+        model,
+        input_ids,
+        attention_mask,
+        labels
+):
+    with torch.no_grad():
+        outputs = model(
+            input_ids=input_ids,
+            attention_mask=attention_mask
+        )
+        lm_logits = outputs['logits']  # [bsize, seqlen, vocab]
+
+        # Use the value of the vocab on each [MASK] as the loss
+        if labels is not None:
+            loss = []
+            loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
+            for i in range(labels.size(1) - 2):
+                _logits = lm_logits[i, i + 2, :].contiguous()
+                _loss = loss_fct(_logits, labels[0, i])
+                loss.append(_loss.cpu())
+
+        return np.array(loss)  # (bsize, )
+
+
+def run_bert_model(
+        model,
+        tokenizer,
+        sents,
+        cuda=True
+):
+    assert isinstance(sents, list)
+
+    logps = []
+    for sent in sents:
+        sent_inputs = tokenizer(sent)['input_ids']
+
+        if len(sent_inputs) > MAX_LENGTH:
+            return None
+
+        masked_sents = []
+        # Don't use the 1st CLS token or the last PAD token
+        for i in range(1, len(sent_inputs) - 1):
+            _sent_inputs = sent_inputs.copy()
+            _sent_inputs[i] = tokenizer.mask_token_id
+            masked_sents.append(
+                tokenizer.decode(_sent_inputs[1:-1])
+            )
+
+        _sents = [tokenizer.pad_token + s for s in masked_sents]
+        inputs = tokenizer(_sents, return_tensors="pt", padding=True)
+        if inputs['input_ids'].size(1) > MAX_LENGTH:
+            return None
+        labels = tokenizer(sent, return_tensors='pt')
+        if cuda:
+            inputs = {k: v.cuda() for k, v in inputs.items()}
+            labels = {k: v.cuda() for k, v in labels.items()}
+        loss = compute_bert_loss(
+            model, input_ids=inputs['input_ids'],
+            attention_mask=inputs['attention_mask'],
+            labels=labels['input_ids']
+        )
+
+        # Use mean of 5 MASK logit may make non-sense
+        loss = loss.mean()
+        logps.append(loss)
+    return np.array(logps)
+
+
 def critic(
         model,  # Load model somewhere else and pass it into the function
         tokenizer,
+        bert_model,
+        bert_tokenizer,
         sent, verbose=1, cuda=True, fp16=True, seed='auto',
         n_samples=100, word_level_mode='refine',
-        return_top_n: int = None
+        return_top_n: int = 10
 ):
     # Set up random seed
     if seed == 'auto':
@@ -150,9 +207,36 @@ def critic(
         if verbose:
             print('Invalid input. Maybe the sentence is too long.')
         return None
+    else:
+        pass
 
-    # Do the same if return_top_n is None
+    # Get top 10
     if return_top_n is None:
+        raise ValueError
+    else:
+        if logps.size()[0] < return_top_n:
+            return None
+        best_indices = logps.topk(return_top_n).indices
+
+        # Make sure best index is 0
+        counter_egs = [sents[idx] for idx in best_indices if idx != 0]
+        counter_egs.insert(0, orig_sent)
+
+        if fp16:
+            with torch.cuda.amp.autocast():
+                logps = run_bert_model(
+                    bert_model, bert_tokenizer, counter_egs, cuda
+                )
+        else:
+            logps = run_bert_model(
+                bert_model, bert_tokenizer, counter_egs, cuda
+            )
+        # Error handling
+        if logps is None:
+            if verbose:
+                print('Invalid input. Maybe the sentence is too long.')
+            return None
+
         best_idx = int(logps.argmax())
         if best_idx != 0:
             is_good = False
@@ -166,16 +250,8 @@ def critic(
                     float(logps[0])))
                 print(
                     'Neighbor sentence with highest log(p): {} (= {:.3f})'.format(
-                        sents[best_idx], float(logps[best_idx])))
+                        counter_egs[best_idx], float(logps[best_idx])))
         counter_example = None
         if not is_good:
-            counter_example = [sents[best_idx], float(logps[best_idx])]
+            counter_example = [counter_egs[best_idx], float(logps[best_idx])]
         return is_good, float(logps[0]), counter_example
-    else:
-        r = []
-        best_indices = logps.topk(return_top_n).indices
-        for idx in best_indices:
-            counter_example = sents[idx]
-            r.append((int(idx), counter_example, float(logps[idx])))
-
-        return r

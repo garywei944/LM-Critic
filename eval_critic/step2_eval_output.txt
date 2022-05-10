@@ -1,0 +1,49 @@
+Loaded gpt2 and bert-base-uncased
+1
+log p(bad) < log p(good)? 388 / 585 = 0.663
+
+LM-Critic:
+  Good precision = 173 / 267 = 0.648
+  Good recall    = 173 / 586 = 0.295
+  Good F0.5      = 0.523
+  Bad precision  = 491 / 904 = 0.543
+  Bad recall     = 491 / 585 = 0.839
+  Bad F0.5       = 0.584
+Loaded gpt2 and roberta-base
+log p(bad) < log p(good)? 510 / 586 = 0.870
+
+LM-Critic:
+  Good precision = 196 / 270 = 0.726
+  Good recall    = 196 / 586 = 0.334
+  Good F0.5      = 0.588
+  Bad precision  = 512 / 902 = 0.568
+  Bad recall     = 512 / 586 = 0.874
+  Bad F0.5       = 0.610
+Loaded gpt2 and emilyalsentzer/Bio_ClinicalBERT
+1
+1
+log p(bad) < log p(good)? 355 / 585 = 0.607
+Loaded gpt2 and emilyalsentzer/Bio_ClinicalBERT
+1
+1
+log p(bad) < log p(good)? 355 / 585 = 0.607
+
+LM-Critic:
+  Good precision = 61 / 91 = 0.670
+  Good recall    = 61 / 585 = 0.104
+  Good F0.5      = 0.321
+  Bad precision  = 555 / 1079 = 0.514
+  Bad recall     = 555 / 585 = 0.949
+  Bad F0.5       = 0.566
+Loaded gpt2 and dmis-lab/biobert-base-cased-v1.2
+1
+1
+log p(bad) < log p(good)? 437 / 585 = 0.747
+
+LM-Critic:
+  Good precision = 113 / 166 = 0.681
+  Good recall    = 113 / 585 = 0.193
+  Good F0.5      = 0.452
+  Bad precision  = 532 / 1004 = 0.530
+  Bad recall     = 532 / 585 = 0.909
+  Bad F0.5       = 0.578

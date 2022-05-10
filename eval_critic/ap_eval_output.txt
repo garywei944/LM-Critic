@@ -1,0 +1,10 @@
+Loaded EleutherAI/gpt-neo-1.3B
+log p(bad) < log p(good)? 557 / 586 = 0.951
+
+LM-Critic:
+  Good precision = 418 / 649 = 0.644
+  Good recall    = 418 / 586 = 0.713
+  Good F0.5      = 0.657
+  Bad precision  = 355 / 523 = 0.679
+  Bad recall     = 355 / 586 = 0.606
+  Bad F0.5       = 0.663
